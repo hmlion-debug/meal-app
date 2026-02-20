@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>2週間分 作り置き献立アプリ（週別買い出し／仕込み日別レシピ／履歴）</title>
+  <style>
+    :root{
+      --bg:#0b1220; --line:rgba(255,255,255,.10);
+      --text:rgba(255,255,255,.92); --muted:rgba(255,255,255,.68);
+      --strong:rgba(255,255,255,.98); --accent:#7dd3fc; --accent2:#a78bfa;
+      --radius:18px; --shadow:0 14px 36px rgba(0,0,0,.35); --max:1000px;
+      --font:ui-sans-serif,system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:var(--font); color:var(--text); overflow-x:hidden;
+      background:
+        radial-gradient(1200px 700px at 20% 10%, rgba(125,211,252,.14), transparent 55%),
+        radial-gradient(900px 600px at 80% 20%, rgba(167,139,250,.14), transparent 55%),
+        linear-gradient(180deg, #060a12, var(--bg) 60%, #050913);
+    }
+    .app{min-height:100%; display:flex; flex-direction:column}
+    header{position:sticky; top:0; z-index:10; backdrop-filter:blur(10px);
+      background:linear-gradient(180deg, rgba(6,10,18,.88), rgba(6,10,18,.62));
+      border-bottom:1px solid var(--line)}
+    .head{max-width:var(--max); margin:0 auto; padding:14px 14px 8px; display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap}
+    .badge{display:inline-flex; align-items:center; padding:6px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; color:var(--muted)}
+    h1{margin:8px 0 2px; font-size:22px; line-height:1.2; color:var(--strong)}
+    .sub{margin:0; font-size:12px; color:var(--muted)}
+    .actions{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap}
+    .btn{border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--text); padding:10px 12px; border-radius:12px}
+    nav{max-width:var(--max); margin:0 auto; padding:0 14px 10px; display:flex; gap:8px; overflow:auto}
+    .tab{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); padding:8px 10px; border-radius:999px; white-space:nowrap}
+    .tab.on{border-color:rgba(125,211,252,.45); background:linear-gradient(90deg, rgba(125,211,252,.14), rgba(167,139,250,.12))}
+    main{max-width:var(--max); margin:0 auto; padding:12px 14px 18px; width:100%}
+    .card{border:1px solid var(--line); border-radius:var(--radius); background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.035)); box-shadow:var(--shadow); padding:12px; margin-bottom:12px}
+    .h2{margin:0 0 6px; font-size:18px}
+    .muted{color:var(--muted); font-size:12px}
+    .toolbar{border:1px solid var(--line); border-radius:var(--radius); background:rgba(255,255,255,.04); padding:10px; margin-bottom:12px}
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+    @media (max-width:640px){.row{grid-template-columns:1fr}}
+    input{width:100%; border:1px solid var(--line); background:rgba(0,0,0,.18); color:var(--text); padding:10px; border-radius:10px}
+    .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+    .chip{border:1px solid var(--line); background:rgba(255,255,255,.03); color:var(--text); padding:6px 8px; border-radius:999px; font-size:12px}
+    .chip.on{border-color:rgba(52,211,153,.45); background:rgba(52,211,153,.12)}
+    .panel{display:none}
+    .panel.on{display:block}
+    .wrap{overflow:visible}
+    table{width:100%; border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--line); padding:8px 6px; vertical-align:top}
+    th{font-size:12px; color:var(--muted)}
+    @media (max-width:520px){
+      thead{display:none}
+      table,tbody,tr,td{display:block; width:100%}
+      tr{border:1px solid var(--line); border-radius:14px; margin:8px 0; padding:8px; background:rgba(0,0,0,.12)}
+      td{border:none; display:flex; justify-content:space-between; gap:10px}
+      td::before{content:attr(data-label); color:var(--muted); font-size:12px}
+      td:first-child{font-weight:700}
+    }
+    details{border:1px solid var(--line); border-radius:12px; background:rgba(255,255,255,.03); margin:8px 0}
+    summary{cursor:pointer; padding:10px; font-weight:700}
+    .grid2{display:grid; grid-template-columns:1fr 1.2fr; gap:10px; padding:0 10px 10px}
+    @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+    .box{border:1px solid var(--line); border-radius:10px; padding:8px; background:rgba(0,0,0,.12)}
+    .list{list-style:none; padding:0; margin:0}
+    .rowItem{display:flex; justify-content:space-between; gap:10px; border-bottom:1px dashed rgba(255,255,255,.12); padding:4px 0}
+    .rowItem:last-child{border-bottom:none}
+    .hist{display:grid; gap:8px}
+    .histItem{border:1px solid var(--line); border-radius:12px; padding:10px; background:rgba(255,255,255,.03)}
+    .note{border-left:3px solid rgba(125,211,252,.55); padding:8px 10px; background:rgba(125,211,252,.06); border-radius:12px; margin:8px 0}
+    .checkRow{display:flex; align-items:flex-start; gap:10px; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.12)}
+    .checkRow:last-child{border-bottom:none}
+    .checkRow input[type="checkbox"]{width:18px; height:18px; margin-top:2px}
+    .checkMain{display:flex; justify-content:space-between; gap:10px; width:100%}
+    .qty{color:var(--muted); white-space:nowrap}
+    .checked .name{opacity:.65; text-decoration:line-through}
+    .miniBtn{border:1px solid var(--line); background:rgba(255,255,255,.04); color:var(--text); padding:8px 10px; border-radius:12px; font-size:12px}
+    .tag{display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px;
+         border:1px solid rgba(125,211,252,.35); background:rgba(125,211,252,.10); color:var(--text);}
+    .tag2{border-color:rgba(167,139,250,.35); background:rgba(167,139,250,.10)}
+    .kbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0}
+    footer{max-width:var(--max); margin:0 auto; padding:0 14px 24px}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="head">
+      <div>
+        <div class="badge">MEAL PREP</div>
+        <h1>2週間分 作り置き献立</h1>
+        <p class="sub">日付付き｜主菜は毎日別・<strong>主菜は1日分量</strong>｜<strong>週別買い出し</strong>｜<strong>仕込み日別レシピ</strong>｜履歴（献立/食材/レシピ保存）</p>
+      </div>
+      <div class="actions">
+        <button class="btn" id="saveHist">履歴に保存</button>
+        <button class="btn" id="resetChecks">買い物チェックをリセット</button>
+        <button class="btn" onclick="window.print()">印刷</button>
+      </div>
+    </div>
+    <nav>
+      <button class="tab on" data-tab="menu">献立</button>
+      <button class="tab" data-tab="shopping">食材</button>
+      <button class="tab" data-tab="recipes">レシピ</button>
+      <button class="tab" data-tab="history">履歴</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="toolbar">
+      <div class="row">
+        <label>
+          <div class="muted">開始日（2週間の起点）</div>
+          <input type="date" id="startDate" />
+        </label>
+        <label>
+          <div class="muted">検索</div>
+          <input type="search" id="q" placeholder="例：白菜、味噌、きんぴら…" />
+        </label>
+      </div>
+      <div class="chips">
+        <button class="chip on" data-filter="all">全て</button>
+        <button class="chip" data-filter="week1">1週目</button>
+        <button class="chip" data-filter="week2">2週目</button>
+      </div>
+    </section>
+
+    <!-- 献立 -->
+    <section class="panel on" id="menu">
+      <div class="card note">
+        <div><strong>2歳向けの出し分けメモ</strong></div>
+        <div class="muted">酸味（酢）・塩分は控えめに。取り分け→大人分だけ後から酢/こしょう/七味などで調整。</div>
+      </div>
+
+      <div class="card" data-tags="week1">
+        <h2 class="h2">1週目（仕込み：日曜 → 月・火／ 仕込み：水曜 → 木・金）</h2>
+        <div class="wrap">
+          <table>
+            <thead><tr><th>曜日</th><th>日付</th><th>主菜</th><th>副菜</th><th>汁物</th><th>＋1品</th></tr></thead>
+            <tbody>
+              <tr data-search="月 鶏むね 甘酢 ほうれん草 コーン かぼちゃ 煮 スープ ブロッコリー">
+                <td data-label="曜日">月</td><td data-label="日付" class="d d-mon"></td>
+                <td data-label="主菜">鶏むねと野菜の甘酢あん</td>
+                <td data-label="副菜">ほうれん草コーン / かぼちゃ煮</td>
+                <td data-label="汁物">具だくさん野菜スープ</td>
+                <td data-label="+1品">蒸しブロッコリー</td>
+              </tr>
+              <tr data-search="火 鮭 南蛮 ほうれん草 コーン かぼちゃ 煮 スープ トマト">
+                <td data-label="曜日">火</td><td data-label="日付" class="d d-tue"></td>
+                <td data-label="主菜">鮭の野菜南蛮漬け風</td>
+                <td data-label="副菜">ほうれん草コーン / かぼちゃ煮</td>
+                <td data-label="汁物">具だくさん野菜スープ</td>
+                <td data-label="+1品">ミニトマト</td>
+              </tr>
+              <tr data-search="木 白身魚 あん ひじき 大豆 にんじん しりしり 味噌汁 さつまいも">
+                <td data-label="曜日">木</td><td data-label="日付" class="d d-thu"></td>
+                <td data-label="主菜">白身魚の野菜あんかけ</td>
+                <td data-label="副菜">ひじき大豆煮 / にんじんしりしり</td>
+                <td data-label="汁物">豆腐と玉ねぎの味噌汁</td>
+                <td data-label="+1品">さつまいも甘煮</td>
+              </tr>
+              <tr data-search="金 豚 キャベツ 味噌 ひじき 大豆 にんじん しりしり 味噌汁 さつまいも">
+                <td data-label="曜日">金</td><td data-label="日付" class="d d-fri"></td>
+                <td data-label="主菜">豚とキャベツのやさしい味噌炒め</td>
+                <td data-label="副菜">ひじき大豆煮 / にんじんしりしり</td>
+                <td data-label="汁物">豆腐と玉ねぎの味噌汁</td>
+                <td data-label="+1品">さつまいも甘煮</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" data-tags="week2">
+        <h2 class="h2">2週目（仕込み：日曜 → 月・火／ 仕込み：水曜 → 木・金）</h2>
+        <div class="wrap">
+          <table>
+            <thead><tr><th>曜日</th><th>日付</th><th>主菜</th><th>副菜</th><th>汁物</th><th>＋1品</th></tr></thead>
+            <tbody>
+              <tr data-search="月 豚しゃぶ 温野菜 小松菜 煮びたし かぼちゃ 枝豆 サラダ 中華 スープ きゅうり 浅漬け">
+                <td data-label="曜日">月</td><td data-label="日付" class="d2 d2-mon"></td>
+                <td data-label="主菜">豚しゃぶ 温野菜のせ</td>
+                <td data-label="副菜">小松菜煮びたし / かぼちゃ枝豆サラダ</td>
+                <td data-label="汁物">野菜たっぷり中華スープ</td>
+                <td data-label="+1品">きゅうり浅漬け</td>
+              </tr>
+              <tr data-search="火 鶏そぼろ 野菜 あん 小松菜 煮びたし かぼちゃ 枝豆 サラダ 中華 スープ きゅうり 浅漬け">
+                <td data-label="曜日">火</td><td data-label="日付" class="d2 d2-tue"></td>
+                <td data-label="主菜">鶏そぼろと野菜のあんかけ</td>
+                <td data-label="副菜">小松菜煮びたし / かぼちゃ枝豆サラダ</td>
+                <td data-label="汁物">野菜たっぷり中華スープ</td>
+                <td data-label="+1品">きゅうり浅漬け</td>
+              </tr>
+              <tr data-search="木 鶏団子 白菜 とろとろ ブロッコリー 白和え きんぴら ごぼう 味噌汁 さつまいも 玉ねぎ トマト">
+                <td data-label="曜日">木</td><td data-label="日付" class="d2 d2-thu"></td>
+                <td data-label="主菜">鶏団子と白菜のとろとろ煮</td>
+                <td data-label="副菜">ブロッコリー白和え / きんぴらごぼう</td>
+                <td data-label="汁物">さつまいもと玉ねぎの味噌汁</td>
+                <td data-label="+1品">ミニトマト</td>
+              </tr>
+              <tr data-search="金 タラ クリーム 煮 ブロッコリー 白和え きんぴら ごぼう 味噌汁 さつまいも 玉ねぎ トマト">
+                <td data-label="曜日">金</td><td data-label="日付" class="d2 d2-fri"></td>
+                <td data-label="主菜">タラと野菜のクリーム煮</td>
+                <td data-label="副菜">ブロッコリー白和え / きんぴらごぼう</td>
+                <td data-label="汁物">さつまいもと玉ねぎの味噌汁</td>
+                <td data-label="+1品">ミニトマト</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 食材：週別 -->
+    <section class="panel" id="shopping">
+      <div class="card">
+        <h2 class="h2">買い出し（週ごと）</h2>
+        <p class="muted">1週目＝日曜に月火分＋水曜に木金分を仕込み。2週目も同様。チェックは端末に保存されます。</p>
+
+        <div class="kbar">
+          <span class="tag">1週目</span>
+          <button class="miniBtn" data-scope="w1" data-act="all">1週目：全部チェック</button>
+          <button class="miniBtn" data-scope="w1" data-act="none">1週目：全部はずす</button>
+          <span class="tag tag2">2週目</span>
+          <button class="miniBtn" data-scope="w2" data-act="all">2週目：全部チェック</button>
+          <button class="miniBtn" data-scope="w2" data-act="none">2週目：全部はずす</button>
+        </div>
+
+        <details open>
+          <summary>1週目（買い出し）</summary>
+          <div class="box">
+            <div class="muted">主菜：鶏むね甘酢／鮭南蛮／白身魚あん／豚味噌炒め + 副菜/汁物</div>
+          </div>
+          <details open><summary>野菜（1週目）</summary><div class="list" id="w1-veg"></div></details>
+          <details><summary>たんぱく源・卵・豆製品（1週目）</summary><div class="list" id="w1-protein"></div></details>
+          <details><summary>乾物・乳製品・粉・調味（1週目）</summary><div class="list" id="w1-pantry"></div></details>
+        </details>
+
+        <details>
+          <summary>2週目（買い出し）</summary>
+          <div class="box">
+            <div class="muted">主菜：豚しゃぶ／鶏そぼろあん／鶏団子白菜／タラクリーム煮 + 副菜/汁物</div>
+          </div>
+          <details open><summary>野菜（2週目）</summary><div class="list" id="w2-veg"></div></details>
+          <details><summary>たんぱく源・卵・豆製品（2週目）</summary><div class="list" id="w2-protein"></div></details>
+          <details><summary>乾物・乳製品・粉・調味（2週目）</summary><div class="list" id="w2-pantry"></div></details>
+        </details>
+      </div>
+    </section>
+
+    <!-- レシピ：仕込み日別 -->
+    <section class="panel" id="recipes">
+      <div class="card">
+        <h2 class="h2">レシピ（仕込み日別）</h2>
+        <p class="muted">日曜：月・火ぶんを中心に仕込み／水曜：木・金ぶんを中心に仕込み。主菜は全て「1日分量」です。</p>
+
+        <details open>
+          <summary><span class="tag">日曜に仕込む（主に：月・火）</span></summary>
+          <div class="box muted">おすすめの流れ：①野菜スープ→②かぼちゃ煮→③ほうれん草コーン→④主菜は当日加熱でもOK</div>
+
+          <details open><summary>【主菜】鶏むねと野菜の甘酢あん（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料（大人2＋子ども1）</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>鶏むね肉</span><span>300g</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>3/4個（約110g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/3本（約50g）</span></li>
+                  <li class="rowItem"><span>ピーマン</span><span>1.5個（約60g）</span></li>
+                  <li class="rowItem"><span>片栗粉</span><span>大さじ1.5</span></li>
+                  <li class="rowItem"><span>油</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>大さじ1.5</span></li>
+                  <li class="rowItem"><span>A みりん</span><span>大さじ3/4</span></li>
+                  <li class="rowItem"><span>A 砂糖</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>A 酢</span><span>大さじ1.5（子ども分は控えめ）</span></li>
+                  <li class="rowItem"><span>A 水</span><span>110ml</span></li>
+                  <li class="rowItem"><span>B 水溶き片栗粉</span><span>小さじ1.5＋水小さじ1.5</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方（詳しい手順）</strong>
+                <ol>
+                  <li>鶏むねは繊維を断つ向きにそぎ切り（1.5cm厚）→一口大。水分を拭く。</li>
+                  <li>野菜：玉ねぎ5mm、にんじん短冊、ピーマン細切り。</li>
+                  <li>鶏に片栗粉を薄くまぶす（粉は白くなる程度）。</li>
+                  <li>中火で油→鶏を並べ、動かさず1〜2分。焼き色が付いたら返す。</li>
+                  <li>裏面も1分焼いたら一旦取り出す（余熱で火が入る）。</li>
+                  <li>同フライパンに野菜→1分→A→沸騰→弱め中火2分。</li>
+                  <li>鶏を戻し、火を弱めB→再沸騰まで1分（とろみ固定）。</li>
+                  <li>子ども分を先に取り分け→大人分だけ酢・こしょう等で調整。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>【主菜】鮭の野菜南蛮漬け風（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>生鮭</span><span>2切（約200g）</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/2個（80g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/2本（80g）</span></li>
+                  <li class="rowItem"><span>ピーマン</span><span>1個（40g）</span></li>
+                  <li class="rowItem"><span>A だし or 水</span><span>200ml</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>A 砂糖</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>B 酢</span><span>小さじ2（火止め後）</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>野菜：玉ねぎ薄切り、にんじん・ピーマン細切り。</li>
+                  <li>小鍋でAを沸かし火を止め、Bを入れる（酸味は後入れでまろやか）。</li>
+                  <li>②に野菜を入れて余熱で2〜3分しんなり。</li>
+                  <li>鮭は水分を拭き、グリル or フライパンで焼く。</li>
+                  <li>保存容器に鮭→野菜ダレ。粗熱が取れたら冷蔵。30分で味がなじむ。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】ほうれん草コーン（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>ほうれん草</span><span>1束（200g）</span></li>
+                  <li class="rowItem"><span>コーン</span><span>120〜150g</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>小さじ1</span></li>
+                  <li class="rowItem"><span>バター（任意）</span><span>5g</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong>
+                <ol>
+                  <li>ほうれん草をさっと茹でて冷水→水気を絞り3cm。</li>
+                  <li>コーンの水気を切る。フライパンでさっと炒め、しょうゆで香り付け。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】かぼちゃ煮（作り置き3日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>かぼちゃ</span><span>可食500g</span></li>
+                  <li class="rowItem"><span>水</span><span>200ml</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>みりん</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>砂糖</span><span>大さじ1</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong>
+                <ol>
+                  <li>鍋に皮を下にして並べ、調味液→落とし蓋。</li>
+                  <li>沸騰→弱め中火で10〜12分。煮汁ごと冷ます。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【汁物】具だくさん野菜スープ（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料（約5〜6杯）</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>玉ねぎ</span><span>1個</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1本</span></li>
+                  <li class="rowItem"><span>じゃがいも</span><span>2個</span></li>
+                  <li class="rowItem"><span>キャベツ</span><span>200g</span></li>
+                  <li class="rowItem"><span>水</span><span>900ml</span></li>
+                  <li class="rowItem"><span>コンソメ</span><span>小さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong>
+                <ol>
+                  <li>野菜を切って鍋へ→沸騰後弱め中火10分。</li>
+                  <li>コンソメで整える。煮詰まれば水を足す。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【＋1品】蒸しブロッコリー（当日/作り置き1日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong><ul class="list"><li class="rowItem"><span>ブロッコリー</span><span>1株</span></li></ul></div>
+              <div class="box"><strong>作り方</strong><ol><li>フライパンに水大さじ2→蓋→中火3分→蒸らし1分。</li></ol></div>
+            </div>
+          </details>
+        </details>
+
+        <details>
+          <summary><span class="tag tag2">水曜に仕込む（主に：木・金）</span></summary>
+          <div class="box muted">おすすめの流れ：①ひじき煮→②にんじんしりしり→③味噌汁は「具だけ」作って当日味噌→④主菜は当日仕上げ</div>
+
+          <details open><summary>【主菜】白身魚の野菜あんかけ（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>白身魚（タラ等）</span><span>2切（約200g）</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/3個（50g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/3本（50g）</span></li>
+                  <li class="rowItem"><span>ピーマン</span><span>1/2個（20g）</span></li>
+                  <li class="rowItem"><span>A だし</span><span>180ml</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>A みりん</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>A 砂糖</span><span>小さじ1.5</span></li>
+                  <li class="rowItem"><span>B 水溶き片栗粉</span><span>小さじ1.5＋水小さじ1.5</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>野菜を細切りにして鍋へ。Aを入れ沸騰後、弱め中火で2分。</li>
+                  <li>火を弱めB→再沸騰まで加熱（とろみ固定）。</li>
+                  <li>魚は焼く/蒸す。食べる直前にあんを温めてかける。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>【主菜】豚とキャベツのやさしい味噌炒め（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>豚薄切り</span><span>250g</span></li>
+                  <li class="rowItem"><span>キャベツ</span><span>300g</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/2個（80g）</span></li>
+                  <li class="rowItem"><span>油</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>A 味噌</span><span>大さじ1.5</span></li>
+                  <li class="rowItem"><span>A みりん</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>小さじ1</span></li>
+                  <li class="rowItem"><span>A 水</span><span>大さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>Aを混ぜて溶かす。キャベツざく切り、玉ねぎ薄切り。</li>
+                  <li>中火で油→豚を炒めて色が変わったら玉ねぎ→キャベツ。</li>
+                  <li>しんなりしたらAを回し入れ、1分絡める（焦げそうなら水を少し）。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】ひじき大豆煮（作り置き3日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>乾燥ひじき</span><span>20g</span></li>
+                  <li class="rowItem"><span>大豆水煮</span><span>150g</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/2本</span></li>
+                  <li class="rowItem"><span>油揚げ</span><span>1枚</span></li>
+                  <li class="rowItem"><span>だし</span><span>200ml</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>大さじ1.5</span></li>
+                  <li class="rowItem"><span>みりん</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>砂糖</span><span>小さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>ひじきを戻す。具を炒めて調味液→弱火10分。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】にんじんしりしり（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>にんじん</span><span>2本</span></li>
+                  <li class="rowItem"><span>卵</span><span>2個</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>小さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>にんじんを炒め→しょうゆ→卵でとじる。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【汁物】豆腐と玉ねぎの味噌汁（当日／仕込みは具まで）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料（約4杯）</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>だし</span><span>600ml</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/2個</span></li>
+                  <li class="rowItem"><span>豆腐</span><span>150g</span></li>
+                  <li class="rowItem"><span>味噌</span><span>大さじ1.5〜2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong>
+                <ol>
+                  <li>（仕込み）玉ねぎをだしで煮て冷蔵（味噌は入れない）。</li>
+                  <li>（当日）温め直して豆腐→火を止めて味噌。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【＋1品】さつまいも甘煮（作り置き3日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>さつまいも</span><span>2本</span></li>
+                  <li class="rowItem"><span>水</span><span>250ml</span></li>
+                  <li class="rowItem"><span>砂糖</span><span>大さじ2</span></li>
+                  <li class="rowItem"><span>みりん</span><span>大さじ1</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>輪切り→さらす→弱火10〜12分→煮汁ごと冷ます。</li></ol></div>
+            </div>
+          </details>
+        </details>
+
+        <details>
+          <summary><span class="tag">日曜に仕込む（2週目：月・火）</span></summary>
+          <div class="box muted">おすすめの流れ：①中華スープ→②小松菜煮びたし→③かぼちゃ枝豆サラダ→④浅漬け</div>
+
+          <details open><summary>【主菜】豚しゃぶ 温野菜のせ（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>豚しゃぶ用</span><span>350g</span></li>
+                  <li class="rowItem"><span>チンゲン菜</span><span>2株（300g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/2本（80g）</span></li>
+                  <li class="rowItem"><span>もやし</span><span>200g</span></li>
+                  <li class="rowItem"><span>タレ：しょうゆ</span><span>大さじ2</span></li>
+                  <li class="rowItem"><span>タレ：酢</span><span>大さじ1（子どもは控えめ）</span></li>
+                  <li class="rowItem"><span>タレ：砂糖</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>タレ：ごま油</span><span>小さじ1</span></li>
+                  <li class="rowItem"><span>タレ：白すりごま</span><span>大さじ1</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>タレを混ぜる（子ども用は酢少なめで別容器）。</li>
+                  <li>野菜を茹でてザルへ。続けて豚を1枚ずつくぐらせ、色が変わったら引き上げる。</li>
+                  <li>温野菜→豚を盛り、タレをかける。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【主菜】鶏そぼろと野菜のあんかけ（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>鶏ひき肉</span><span>250g</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/3個（50g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/3本（50g）</span></li>
+                  <li class="rowItem"><span>チンゲン菜（葉）</span><span>80g</span></li>
+                  <li class="rowItem"><span>油</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>A 水</span><span>200ml</span></li>
+                  <li class="rowItem"><span>A 鶏がら</span><span>小さじ1.25</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>小さじ1.5</span></li>
+                  <li class="rowItem"><span>B 水溶き片栗粉</span><span>小さじ1.5＋水小さじ1.5</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>野菜を切る。ひき肉を中火で炒め、色が変わったら玉ねぎ・にんじん。</li>
+                  <li>Aを入れて3分煮る→チンゲン菜を1分→火を弱めB→再沸騰。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】小松菜煮びたし（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>小松菜</span><span>1束</span></li>
+                  <li class="rowItem"><span>だし</span><span>150ml</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>みりん</span><span>小さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>だしを沸かし→小松菜2分→冷ます。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】かぼちゃ枝豆サラダ（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>かぼちゃ</span><span>可食250g</span></li>
+                  <li class="rowItem"><span>枝豆（むき身）</span><span>150g</span></li>
+                  <li class="rowItem"><span>ヨーグルト/マヨ</span><span>大さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>かぼちゃレンチン→潰す→調味→枝豆。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【汁物】野菜たっぷり中華スープ（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料（約5〜6杯）</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/2個</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/2本</span></li>
+                  <li class="rowItem"><span>チンゲン菜（茎）</span><span>200g</span></li>
+                  <li class="rowItem"><span>もやし</span><span>200g</span></li>
+                  <li class="rowItem"><span>水</span><span>900ml</span></li>
+                  <li class="rowItem"><span>鶏がら</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>しょうゆ</span><span>小さじ2</span></li>
+                </ul>
+              </div>
+              <div class="box"><strong>作り方</strong><ol><li>煮る→最後に香り付け（ごま油は取り分け後）。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【＋1品】きゅうり浅漬け（作り置き2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong><ul class="list"><li class="rowItem"><span>きゅうり</span><span>3本</span></li><li class="rowItem"><span>塩</span><span>小さじ1/2</span></li><li class="rowItem"><span>砂糖</span><span>小さじ1</span></li></ul></div>
+              <div class="box"><strong>作り方</strong><ol><li>袋で揉む→10分→冷蔵。</li></ol></div>
+            </div>
+          </details>
+        </details>
+
+        <details>
+          <summary><span class="tag tag2">水曜に仕込む（2週目：木・金）</span></summary>
+          <div class="box muted">おすすめの流れ：①きんぴら→②白和え→③味噌汁は具まで→④主菜は当日仕上げ</div>
+
+          <details open><summary>【主菜】鶏団子と白菜のとろとろ煮（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>鶏ひき肉</span><span>150g</span></li>
+                  <li class="rowItem"><span>玉ねぎ（みじん）</span><span>1/4個（40g）</span></li>
+                  <li class="rowItem"><span>卵</span><span>1/2個（溶いて半量）</span></li>
+                  <li class="rowItem"><span>片栗粉</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>白菜</span><span>400g</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/3本（50g）</span></li>
+                  <li class="rowItem"><span>A だし</span><span>450ml</span></li>
+                  <li class="rowItem"><span>A しょうゆ</span><span>大さじ1</span></li>
+                  <li class="rowItem"><span>A みりん</span><span>小さじ2</span></li>
+                  <li class="rowItem"><span>B 水溶き片栗粉</span><span>小さじ1.5＋水小さじ1.5</span></li>
+                </ul>
+                <div class="muted">卵は余りやすいので、残り半量は翌朝の卵焼き等に。</div>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>団子だね：材料を粘りが出るまで混ぜる。</li>
+                  <li>鍋に白菜・にんじん・Aを入れ沸騰→弱め中火。</li>
+                  <li>団子を落として再沸騰後3分。火を弱めB→再沸騰。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【主菜】タラと野菜のクリーム煮（1日分）</summary>
+            <div class="grid2">
+              <div class="box">
+                <strong>材料</strong>
+                <ul class="list">
+                  <li class="rowItem"><span>タラ</span><span>2切（約200g）</span></li>
+                  <li class="rowItem"><span>玉ねぎ</span><span>1/2個（80g）</span></li>
+                  <li class="rowItem"><span>にんじん</span><span>1/3本（50g）</span></li>
+                  <li class="rowItem"><span>じゃがいも</span><span>1個（150g）</span></li>
+                  <li class="rowItem"><span>バター</span><span>10g</span></li>
+                  <li class="rowItem"><span>小麦粉</span><span>大さじ2</span></li>
+                  <li class="rowItem"><span>牛乳</span><span>400ml</span></li>
+                  <li class="rowItem"><span>コンソメ</span><span>小さじ1</span></li>
+                  <li class="rowItem"><span>塩</span><span>少々</span></li>
+                </ul>
+              </div>
+              <div class="box">
+                <strong>作り方</strong>
+                <ol>
+                  <li>野菜を薄切り。鍋でバター→野菜を3分炒める。</li>
+                  <li>弱火で小麦粉を1分炒め、牛乳を少量ずつ加えて伸ばす。</li>
+                  <li>ふつふつしたらコンソメ→5分→タラを入れて3分。塩で調整。</li>
+                </ol>
+              </div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】ブロッコリー白和え（作り置き1〜2日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong><ul class="list"><li class="rowItem"><span>ブロッコリー</span><span>1株</span></li><li class="rowItem"><span>豆腐</span><span>150g</span></li><li class="rowItem"><span>すりごま</span><span>大さじ1.5</span></li><li class="rowItem"><span>しょうゆ</span><span>小さじ1</span></li><li class="rowItem"><span>砂糖</span><span>小さじ1</span></li></ul></div>
+              <div class="box"><strong>作り方</strong><ol><li>豆腐水切り→調味→ブロッコリーを和える。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【副菜】きんぴらごぼう（作り置き3日）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong><ul class="list"><li class="rowItem"><span>ごぼう</span><span>200g</span></li><li class="rowItem"><span>にんじん</span><span>50g</span></li><li class="rowItem"><span>ごま油</span><span>小さじ2</span></li><li class="rowItem"><span>しょうゆ</span><span>大さじ1</span></li><li class="rowItem"><span>みりん</span><span>大さじ1</span></li><li class="rowItem"><span>砂糖</span><span>小さじ2</span></li></ul></div>
+              <div class="box"><strong>作り方</strong><ol><li>炒め→調味→汁気を飛ばす。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【汁物】さつまいもと玉ねぎの味噌汁（当日／仕込みは具まで）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料（約4杯）</strong><ul class="list"><li class="rowItem"><span>だし</span><span>600ml</span></li><li class="rowItem"><span>さつまいも</span><span>150g</span></li><li class="rowItem"><span>玉ねぎ</span><span>1/2個</span></li><li class="rowItem"><span>味噌</span><span>大さじ1.5〜2</span></li></ul></div>
+              <div class="box"><strong>作り方</strong><ol><li>（仕込み）具を煮て冷蔵→（当日）温めて味噌。</li></ol></div>
+            </div>
+          </details>
+
+          <details><summary>【＋1品】ミニトマト（そのまま）</summary>
+            <div class="grid2">
+              <div class="box"><strong>材料</strong><ul class="list"><li class="rowItem"><span>ミニトマト</span><span>1回あたり6〜10個</span></li></ul></div>
+              <div class="box"><strong>ポイント</strong><ol><li>子どもは縦4等分が安心。</li></ol></div>
+            </div>
+          </details>
+        </details>
+
+      </div>
+    </section>
+
+    <!-- 履歴 -->
+    <section class="panel" id="history">
+      <div class="card">
+        <h2 class="h2">履歴（過去の2週間分スナップショット）</h2>
+        <p class="muted">「履歴に保存」で、その時点の<strong>献立・食材（チェック状態含む）・レシピ</strong>を丸ごと保存します。</p>
+        <div class="hist" id="histList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="muted">※買い物チェックと履歴はこの端末のブラウザ（localStorage）に保存されます。</p>
+  </footer>
+</div>
+
+<script>
+  // Tabs
+  const tabs = document.querySelectorAll('.tab');
+  const panels = {
+    menu: document.getElementById('menu'),
+    shopping: document.getElementById('shopping'),
+    recipes: document.getElementById('recipes'),
+    history: document.getElementById('history')
+  };
+  tabs.forEach(t=>t.onclick=()=>{
+    tabs.forEach(x=>x.classList.remove('on')); t.classList.add('on');
+    Object.values(panels).forEach(p=>p.classList.remove('on'));
+    panels[t.dataset.tab].classList.add('on');
+  });
+
+  // Filters + search
+  const chips = document.querySelectorAll('.chip');
+  const q = document.getElementById('q');
+  chips.forEach(c=>c.onclick=()=>{ chips.forEach(x=>x.classList.remove('on')); c.classList.add('on'); apply(); });
+  q.oninput = apply;
+
+  function apply(){
+    const kw = (q.value||'').toLowerCase();
+    const f = document.querySelector('.chip.on').dataset.filter;
+
+    // menu filter
+    document.querySelectorAll('#menu .card').forEach(card=>{
+      const tags = (card.dataset.tags||'').split(/\s+/);
+      const showCard = f==='all' || tags.includes(f) || !card.dataset.tags;
+      card.style.display = showCard ? '' : 'none';
+      card.querySelectorAll('tbody tr').forEach(tr=>{
+        const ok = !kw || (tr.dataset.search||tr.innerText).toLowerCase().includes(kw);
+        tr.style.display = ok ? '' : 'none';
+      });
+    });
+
+    // recipe search
+    document.querySelectorAll('#recipes details').forEach(d=>{
+      if(!kw){ d.style.display=''; return; }
+      d.style.display = (d.innerText||'').toLowerCase().includes(kw) ? '' : 'none';
+    });
+
+    // shopping search (by text)
+    document.querySelectorAll('#shopping .checkRow').forEach(r=>{
+      if(!kw){ r.style.display=''; return; }
+      r.style.display = r.innerText.toLowerCase().includes(kw) ? '' : 'none';
+    });
+  }
+
+  // Date labels
+  const startInput = document.getElementById('startDate');
+  function fmt(d){ return `${d.getMonth()+1}/${d.getDate()}`; }
+  function setDates(startStr){
+    const d0 = new Date(startStr);
+    if(isNaN(d0)) return;
+    const dow = d0.getDay();
+    const monday = new Date(d0);
+    const diffToMon = (dow===0? -6 : 1 - dow);
+    monday.setDate(d0.getDate() + diffToMon);
+
+    const w1mon = new Date(monday);
+    const w1tue = new Date(monday); w1tue.setDate(w1tue.getDate()+1);
+    const w1thu = new Date(monday); w1thu.setDate(w1thu.getDate()+3);
+    const w1fri = new Date(monday); w1fri.setDate(w1fri.getDate()+4);
+
+    document.querySelector('.d-mon').textContent = fmt(w1mon);
+    document.querySelector('.d-tue').textContent = fmt(w1tue);
+    document.querySelector('.d-thu').textContent = fmt(w1thu);
+    document.querySelector('.d-fri').textContent = fmt(w1fri);
+
+    const w2mon = new Date(w1mon); w2mon.setDate(w2mon.getDate()+7);
+    const w2tue = new Date(w2mon); w2tue.setDate(w2tue.getDate()+1);
+    const w2thu = new Date(w2mon); w2thu.setDate(w2thu.getDate()+3);
+    const w2fri = new Date(w2mon); w2fri.setDate(w2fri.getDate()+4);
+
+    document.querySelector('.d2-mon').textContent = fmt(w2mon);
+    document.querySelector('.d2-tue').textContent = fmt(w2tue);
+    document.querySelector('.d2-thu').textContent = fmt(w2thu);
+    document.querySelector('.d2-fri').textContent = fmt(w2fri);
+  }
+  startInput.value = '2026-02-24';
+  setDates(startInput.value);
+  startInput.onchange = ()=> setDates(startInput.value);
+
+  // Shopping list with checkboxes (persistent)
+  const CHECK_KEY = 'mealShopChecksV2_weekSplit';
+  const checks = JSON.parse(localStorage.getItem(CHECK_KEY) || '{}');
+
+  // Week 1 items (only what is needed for week 1 recipes)
+  const W1 = {
+    veg: [
+      ["玉ねぎ","約3個（約450g）"],
+      ["にんじん","約4本（約600g）"],
+      ["ピーマン","2個（約80g）"],
+      ["ほうれん草","1束（約200g）"],
+      ["かぼちゃ","可食500g"],
+      ["キャベツ","約500g"],
+      ["じゃがいも","2個（約300g）"],
+      ["ブロッコリー","1株（約250g）"],
+      ["さつまいも","2本（約500g）"],
+      ["ミニトマト","1パック（約200g）"],
+    ],
+    protein: [
+      ["鶏むね肉","300g"],
+      ["鮭","2切（約200g）"],
+      ["白身魚（タラ等）","2切（約200g）"],
+      ["豚薄切り","250g"],
+      ["卵","2個（しりしり用）"],
+      ["豆腐","1丁（300g前後）"],
+      ["油揚げ","1枚"],
+      ["大豆水煮","150g"],
+    ],
+    pantry: [
+      ["ひじき（乾）","20g"],
+      ["コーン（冷凍/缶）","150g"],
+      ["調味料（常備）","しょうゆ／みりん／砂糖／酢／味噌／だし／コンソメ／鶏がら／片栗粉／油"],
+    ]
+  };
+
+  // Week 2 items (only what is needed for week 2 recipes)
+  const W2 = {
+    veg: [
+      ["白菜","1/2玉（約800g）"],
+      ["玉ねぎ","約3個（約450g）"],
+      ["にんじん","約3本（約450g）"],
+      ["チンゲン菜","2株（約300g）"],
+      ["もやし","1袋（約200g）"],
+      ["小松菜","1束（約200g）"],
+      ["かぼちゃ","可食250g"],
+      ["枝豆（冷凍むき身）","150g"],
+      ["きゅうり","3本（約300g）"],
+      ["ブロッコリー","1株（約250g）"],
+      ["ごぼう","1本（約200g）"],
+      ["じゃがいも","1個（約150g）"],
+      ["さつまいも","150g（味噌汁用）"],
+      ["ミニトマト","1パック（約200g）"],
+    ],
+    protein: [
+      ["豚しゃぶ用","350g"],
+      ["鶏ひき肉","400g（250g＋150g）"],
+      ["タラ","2切（約200g）"],
+      ["卵","6個（団子で1/2個使用＋他用）"],
+      ["豆腐","1丁（300g前後）"],
+    ],
+    pantry: [
+      ["牛乳","400ml"],
+      ["バター","10g"],
+      ["小麦粉","大さじ2（約20g）"],
+      ["白すりごま","50g"],
+      ["調味料（常備）","しょうゆ／みりん／砂糖／酢／味噌／だし／鶏がら／コンソメ／片栗粉／ごま油"],
+    ]
+  };
+
+  function rowId(scope, name, qty){ return (scope + '|' + name + '|' + qty).replace(/\s+/g,''); }
+
+  function renderShop(scope, list, mountId){
+    const mount = document.getElementById(mountId);
+    mount.innerHTML = '';
+    list.forEach(([name, qty])=>{
+      const id = rowId(scope, name, qty);
+      const checked = !!checks[id];
+      const row = document.createElement('label');
+      row.className = 'checkRow' + (checked ? ' checked' : '');
+      row.innerHTML = `
+        <input type="checkbox" ${checked ? 'checked':''} data-id="${id}">
+        <div class="checkMain">
+          <div class="name">${name}</div>
+          <div class="qty">${qty}</div>
+        </div>
+      `;
+      mount.appendChild(row);
+    });
+  }
+
+  function bindChecks(){
+    document.querySelectorAll('#shopping input[type="checkbox"]').forEach(cb=>{
+      cb.addEventListener('change', (e)=>{
+        const id = e.target.dataset.id;
+        checks[id] = e.target.checked;
+        e.target.closest('.checkRow').classList.toggle('checked', e.target.checked);
+        localStorage.setItem(CHECK_KEY, JSON.stringify(checks));
+      });
+    });
+  }
+
+  renderShop('w1', W1.veg, 'w1-veg');
+  renderShop('w1', W1.protein, 'w1-protein');
+  renderShop('w1', W1.pantry, 'w1-pantry');
+  renderShop('w2', W2.veg, 'w2-veg');
+  renderShop('w2', W2.protein, 'w2-protein');
+  renderShop('w2', W2.pantry, 'w2-pantry');
+  bindChecks();
+
+  // Week scoped buttons
+  document.querySelectorAll('.miniBtn[data-scope]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const scope = btn.dataset.scope;
+      const act = btn.dataset.act;
+      document.querySelectorAll(`#shopping input[type="checkbox"][data-id^="${scope}|"]`).forEach(cb=>{
+        cb.checked = (act==='all');
+        checks[cb.dataset.id] = (act==='all');
+        cb.closest('.checkRow').classList.toggle('checked', cb.checked);
+      });
+      localStorage.setItem(CHECK_KEY, JSON.stringify(checks));
+    };
+  });
+
+  // Reset
+  document.getElementById('resetChecks').onclick = ()=>{
+    if(!confirm('買い物チェックを全てリセットしますか？')) return;
+    Object.keys(checks).forEach(k=> delete checks[k]);
+    localStorage.setItem(CHECK_KEY, JSON.stringify(checks));
+    renderShop('w1', W1.veg, 'w1-veg');
+    renderShop('w1', W1.protein, 'w1-protein');
+    renderShop('w1', W1.pantry, 'w1-pantry');
+    renderShop('w2', W2.veg, 'w2-veg');
+    renderShop('w2', W2.protein, 'w2-protein');
+    renderShop('w2', W2.pantry, 'w2-pantry');
+    bindChecks();
+  };
+
+  // History snapshot: save menu + shopping (with current checkbox state markup) + recipes
+  const HIST_KEY = 'mealAppHistoryV5';
+  function snapshotHTML(sel){ return document.querySelector(sel).innerHTML; }
+  function loadHist(){
+    const arr = JSON.parse(localStorage.getItem(HIST_KEY)||'[]');
+    const wrap = document.getElementById('histList');
+    wrap.innerHTML = '';
+    if(arr.length===0){ wrap.innerHTML = '<div class="muted">履歴はまだありません。</div>'; return; }
+    arr.slice().reverse().forEach(item=>{
+      const d = document.createElement('details');
+      d.className='histItem';
+      d.open = false;
+      d.innerHTML = `
+        <summary><strong>${item.start}</strong> 〜 2週間分（保存：${new Date(item.savedAt).toLocaleString()}）</summary>
+        <div class="box"><strong>献立</strong><div class="wrap">${item.menu}</div></div>
+        <div class="box"><strong>食材（チェック状態含む）</strong>${item.shopping}</div>
+        <div class="box"><strong>レシピ</strong>${item.recipes}</div>
+      `;
+      wrap.appendChild(d);
+    });
+  }
+  document.getElementById('saveHist').onclick = ()=>{
+    const start = startInput.value;
+    const payload = {
+      start,
+      savedAt: new Date().toISOString(),
+      menu: snapshotHTML('#menu'),
+      shopping: snapshotHTML('#shopping'),
+      recipes: snapshotHTML('#recipes')
+    };
+    const arr = JSON.parse(localStorage.getItem(HIST_KEY)||'[]');
+    arr.push(payload);
+    localStorage.setItem(HIST_KEY, JSON.stringify(arr));
+    loadHist();
+    alert('履歴に保存しました（献立・食材・レシピを保存）');
+  };
+  loadHist();
+</script>
+</body>
+</html>
