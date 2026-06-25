@@ -329,7 +329,11 @@
 
   // ---------- Data load ----------
   async function fetchJSON(url){
-    const res = await fetch(url, {cache:'no-store'});
+    const requestUrl = new URL(url, window.location.href);
+    if(requestUrl.protocol === 'http:' || requestUrl.protocol === 'https:'){
+      requestUrl.searchParams.set('v', Date.now().toString());
+    }
+    const res = await fetch(requestUrl.toString(), {cache:'reload'});
     if(!res.ok) throw new Error(`${url} を読み込めません（${res.status}）`);
     return await res.json();
   }
